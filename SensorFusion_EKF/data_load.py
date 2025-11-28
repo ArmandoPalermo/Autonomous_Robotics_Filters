@@ -79,7 +79,7 @@ def load_data(bag_path):
         })
 
         # Calcola traccia della covarianza per ogni sample
-        result[key]['cov_trace'] = [np.trace(cov) for cov in data[key]['cov']]
+        result[key]['cov_trace'] = [cov[0,0] + cov[1,1] + cov[5,5] for cov in data[key]['cov']]
 
         # Converti quaternion in angolo theta (yaw - rotazione attorno a Z)
         result[key]['theta'] = quaternion_to_yaw(

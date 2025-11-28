@@ -4,7 +4,7 @@ from pathlib import Path
 from Ekf_fusion_node import ekf_sensor_fusion
 
 # Nome del file rosbag nella cartella Rosbag/
-BAG_FILENAME = "Rosbag_Warthog_PercorsoVerde_AR_2526-46-26_4_topics_map.bag"
+BAG_FILENAME = "Rosbag_Warthog_PercorsoVerde_AR_2526-46-26_3_topics_map_drift.bag"
 
 
 if __name__ == "__main__":
@@ -24,7 +24,10 @@ if __name__ == "__main__":
         "theta": [p[3] for p in pose_stima]
     }
 
+
     plot_trajectory(data, ekf_data)
+    plot_cov_trace(data,posterior)
+    plt.show()
 
     # Mostra tutti i plot
     plt.show()
