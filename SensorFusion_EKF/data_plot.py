@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 def plot_trajectory(data, ekf_data):
     plt.figure(figsize=(10, 8))
 
@@ -13,7 +12,7 @@ def plot_trajectory(data, ekf_data):
         plt.plot(data[key]['x'], data[key]['y'],
                  color=color, label=label, linewidth=2, alpha=0.8)
 
-    # --- EKF fusion (traiettoria finale) ---
+    # EKF fusion (traiettoria finale)
     plt.plot(ekf_data['x'], ekf_data['y'],
              color='black', linewidth=3, label='3. EKF Fusion')
 
@@ -22,10 +21,10 @@ def plot_trajectory(data, ekf_data):
     plt.title('Traiettoria: Y vs X', fontsize=14, fontweight='bold')
     plt.legend(fontsize=11)
     plt.grid(True, alpha=0.3)
-    plt.axis('equal')
 
 
-def plot_cov_trace(data, posterior):
+
+def plot_cov_trace(data, posterior, ekf_time):
 
     plt.figure(figsize=(12, 6))
 
@@ -42,7 +41,7 @@ def plot_cov_trace(data, posterior):
         if max_val == 0:
             continue
 
-        trace_norm = trace_values / max_val  # NORMALIZZAZIONE
+        trace_norm = trace_values / max_val
 
         plt.plot(
             data[key]["time"],
@@ -53,15 +52,9 @@ def plot_cov_trace(data, posterior):
             color=color
         )
 
-    #  EKF trace
+    # EKF plot management
     ekf_trace = np.array([np.trace(P) for P in posterior])
     ekf_trace_norm = ekf_trace / np.max(ekf_trace)
-
-    ekf_time = np.linspace(
-        data["dlio"]["time"].min(),
-        data["dlio"]["time"].max(),
-        len(ekf_trace)
-    )
 
     plt.plot(
         ekf_time,
@@ -77,3 +70,4 @@ def plot_cov_trace(data, posterior):
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.legend()
+
