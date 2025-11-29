@@ -4,21 +4,31 @@ import pandas as pd
 from Ekf_fusion_node import quaternion_to_yaw
 
 
-
 def load_data(bag_path):
 
     print(f"Caricamento dati da: {bag_path}")
 
     bag = rosbag.Bag(bag_path)
 
-    # Inizializza dizionari per salvare i dati
+    # Struttura generale
     data = {
-        'gps': {'time': [], 'x': [], 'y': [], 'z': [], 'qx': [], 'qy': [], 'qz': [], 'qw': [], 'cov': []},
-        'dlio': {'time': [], 'x': [], 'y': [], 'z': [], 'qx': [], 'qy': [], 'qz': [], 'qw': [], 'cov': []},
-        'warthog': {'time': [], 'x': [], 'y': [], 'z': [], 'qx': [], 'qy': [], 'qz': [], 'qw': [], 'cov': []}
+        'gps': {},
+        'dlio': {},
+        'warthog': {}
     }
 
-    # Mappa i nomi dei topic alle chiavi del dizionario
+    # Variabili per ogni topic
+    for key in data.keys():
+        data[key] = {
+            'time': [],
+            'x': [], 'y': [], 'z': [],
+            'qx': [], 'qy': [], 'qz': [], 'qw': [],
+            'cov': [],
+            # campi twist -> saranno riempiti solo quando esistono
+            'vx': [], 'vy': [], 'vz': [],
+            'wx': [], 'wy': [], 'wz': []
+        }
+
     topic_map = {
         '/odometry/gps': 'gps',
         '/robot/dlio/odom_node/odom': 'dlio',
@@ -26,62 +36,85 @@ def load_data(bag_path):
     }
 
     timeline = []
-    # Leggi tutti i messaggi dal rosbag
+
+    #Lettura della rosbag messaggio per messaggio
     for topic, msg, t in bag.read_messages():
-        if topic in topic_map:
 
+        if topic not in topic_map:
+            continue
 
+        key = topic_map[topic]
 
-            key = topic_map[topic]
+        timestamp = t.to_sec()
 
-            timeline.append({
-                "time": t.to_sec(),
-                "topic": key,  # gps / dlio / warthog
-                "msg": msg
-            })
+        timeline.append({
+            "time": timestamp,
+            "topic": key,
+            "msg": msg
+        })
 
-            # Salva timestamp (usa il timestamp del rosbag, non del messaggio)
-            data[key]['time'].append(t.to_sec())
+        #  POSA
+        data[key]['time'].append(timestamp)
+        data[key]['x'].append(msg.pose.pose.position.x)
+        data[key]['y'].append(msg.pose.pose.position.y)
+        data[key]['z'].append(msg.pose.pose.position.z)
 
-            # Salva posizione (x, y, z)
-            data[key]['x'].append(msg.pose.pose.position.x)
-            data[key]['y'].append(msg.pose.pose.position.y)
-            data[key]['z'].append(msg.pose.pose.position.z)
+        data[key]['qx'].append(msg.pose.pose.orientation.x)
+        data[key]['qy'].append(msg.pose.pose.orientation.y)
+        data[key]['qz'].append(msg.pose.pose.orientation.z)
+        data[key]['qw'].append(msg.pose.pose.orientation.w)
 
-            # Salva orientamento (quaternion)
-            data[key]['qx'].append(msg.pose.pose.orientation.x)
-            data[key]['qy'].append(msg.pose.pose.orientation.y)
-            data[key]['qz'].append(msg.pose.pose.orientation.z)
-            data[key]['qw'].append(msg.pose.pose.orientation.w)
+        cov_matrix = np.array(msg.pose.covariance).reshape(6, 6)
+        data[key]['cov'].append(cov_matrix)
 
-            # Salva matrice covarianza 6x6
-            cov_matrix = np.array(msg.pose.covariance).reshape(6, 6)
-            data[key]['cov'].append(cov_matrix)
+        #Aggiunta dati twist(SE ESISTE--> gps le ha a 0)
+        if hasattr(msg, "twist"):
+            data[key]["vx"].append(msg.twist.twist.linear.x)
+            data[key]["vy"].append(msg.twist.twist.linear.y)
+            data[key]["vz"].append(msg.twist.twist.linear.z)
+
+            data[key]["wx"].append(msg.twist.twist.angular.x)
+            data[key]["wy"].append(msg.twist.twist.angular.y)
+            data[key]["wz"].append(msg.twist.twist.angular.z)
+        else:
+            # Non esiste twist → metti NaN
+            data[key]["vx"].append(np.nan)
+            data[key]["vy"].append(np.nan)
+            data[key]["vz"].append(np.nan)
+            data[key]["wx"].append(np.nan)
+            data[key]["wy"].append(np.nan)
+            data[key]["wz"].append(np.nan)
 
     bag.close()
 
-    #ordino la timeline
+    # --- ORDINA TIMELINE ---
     timeline = sorted(timeline, key=lambda x: x["time"])
 
-    # Converti in DataFrame per ogni topic
+    # --- COSTRUZIONE DATAFRAME ---
     result = {}
-    for key in ['gps', 'dlio', 'warthog']:
-        # Crea DataFrame con i dati base
+    start_time = timeline[0]['time']
+
+    for key in data.keys():
+
         result[key] = pd.DataFrame({
-            'time': data[key]['time'],
+            'time': np.array(data[key]['time']) - start_time,
             'x': data[key]['x'],
             'y': data[key]['y'],
             'z': data[key]['z'],
             'qx': data[key]['qx'],
             'qy': data[key]['qy'],
             'qz': data[key]['qz'],
-            'qw': data[key]['qw']
+            'qw': data[key]['qw'],
+            'vx': data[key]['vx'],
+            'vy': data[key]['vy'],
+            'vz': data[key]['vz'],
+            'wx': data[key]['wx'],
+            'wy': data[key]['wy'],
+            'wz': data[key]['wz'],
+            'cov_trace': [cov[0,0] + cov[1,1] + cov[5,5] for cov in data[key]['cov']]
         })
 
-        # Calcola traccia della covarianza per ogni sample
-        result[key]['cov_trace'] = [cov[0,0] + cov[1,1] + cov[5,5] for cov in data[key]['cov']]
-
-        # Converti quaternion in angolo theta (yaw - rotazione attorno a Z)
+        # Calcolo yaw
         result[key]['theta'] = quaternion_to_yaw(
             result[key]['qx'].values,
             result[key]['qy'].values,
@@ -89,10 +122,12 @@ def load_data(bag_path):
             result[key]['qw'].values
         )
 
-        # Normalizza il tempo a partire da zero
-        result[key]['time'] = result[key]['time'] - result[key]['time'].min()
+        print(f"{key}: {len(result[key])} samples (pose)")
 
-        print(f"  {key}: {len(result[key])} samples")
+        if key == "warthog":
+            valid_twist = np.sum(~np.isnan(result[key]['vx']))
+            print(f"     {valid_twist} samples con twist (v,w)")
 
-    print("Dati caricati!\n")
+    print("Dati caricati correttamente.\n")
+
     return result, timeline

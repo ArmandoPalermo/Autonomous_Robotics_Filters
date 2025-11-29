@@ -1,12 +1,38 @@
 import numpy as np
 
-
 def quaternion_to_yaw(qx, qy, qz, qw):
     siny_cosp = 2 * (qw * qz + qx * qy)
     cosy_cosp = 1 - 2 * (qy * qy + qz * qz)
     yaw_rad = np.arctan2(siny_cosp, cosy_cosp)
     return yaw_rad # Converti in radianti
 
+def get_Q_Matrix(u):
+    #Parametri da scgliere per la varianza
+    alpha1 = 0.1
+    alpha2 = 0.1
+    alpha3 = 0.1
+    alpha4 = 0.1
+
+    var_v = alpha1 * (u[0] ** 2) + alpha2 * (u[1] ** 2)
+    var_w = alpha3 * (u[0] ** 2) + alpha4 * (u[1] ** 2)
+    Q = np.array([[var_v, 0],
+                  [0, var_w]])
+    return Q
+
+
+
+def prediction_phase(x,P, last_u, delta_t):
+    # FASE DI PREDIZIONE
+    x_prev = x.copy()
+    x_stima = motion_model(x_prev, last_u, delta_t)
+
+    fx = jacobian_fx(x_prev, last_u, delta_t)
+    fu = jacobian_fu(x_prev, last_u, delta_t)
+    Q = get_Q_Matrix(last_u)
+
+    P = fx @ P @ fx.T + fu @ Q @ fu.T
+
+    return x_stima,P
 
 #funzione motion model
 # u = [v,omega]
@@ -36,30 +62,23 @@ def jacobian_fu(x, u, dt):
         [0.,                 dt]
     ])
 
-# H dei tre sensori
-#H_Dlio --> matrice diagonale 3x3 perchè effettuo una correzione sulle 3 comp dello stato
-H_dlio = np.eye(3)
-#H_wheel --> le ruote idelmente correggono anche x e y ma a noi interesa solo theta--> in quanto le velocità rendono piu sicura la sua stima, mentre il drift puo dar
-#problemi durante la correzione(non ha peso)
-H_wheel = np.array([[0., 0., 1.]])
-#H_gps
-H_gps = np.array([[1, 0, 0],
-                  [0, 1, 0]])
-
 
 #A questa funzione passi i dati estratti dal topic
-def ekf_sensor_fusion(timeline):
+def ekf_sensor_fusion(timeline,sensors):
+
+
     pose_stimate = []
     covariances = []
     inizialized = False
 
-    last_u = np.array([0.0, 0.0])
-    last_warthog_Q = np.diag([0.1 ** 2, (5 * np.pi / 180) ** 2])  # Q iniziale sicura finchè non arriva quella delle ruote
-    #last_warthog_Q = np.eye(2)
-    for row in timeline:
+    last_u = np.array([0.1, 0.1])
 
+    for row in timeline:
+        actual_sensor = sensors.get(row["topic"])
+        # Inizializzazione EKF al primo messaggio della rosbag
         if not inizialized:
 
+            # Estrai posizione e orientamento
             x = row['msg'].pose.pose.position.x
             y = row['msg'].pose.pose.position.y
             qx = row['msg'].pose.pose.orientation.x
@@ -68,105 +87,61 @@ def ekf_sensor_fusion(timeline):
             qw = row['msg'].pose.pose.orientation.w
             theta = quaternion_to_yaw(qx, qy, qz, qw)
 
-            #Stima iniziale presa dal primo topic che arriva e covarianza alta
+            # Stato iniziale [x, y, theta]
             x_stima = np.array([x, y, theta])
-            P = np.diag([1.0, 1.0, (10 * np.pi / 180)**2])
+
+            # Covarianza iniziale
+            P = np.diag([1.0, 1.0, (10 * np.pi / 180) ** 2])
             covariances.append(P.copy())
-            #Salvo la prima posa
+
+            # Salvo la prima posa
             pose_stimate.append([row["time"], x, y, theta])
-            #Inizializzazione finita
+
+            # Finito inizializzare
             inizialized = True
             last_time = row["time"]
-
         else:
 
-            #Calcolo il dt e procedo con la fase di PREDIZIONE
+
             delta_t = row['time'] - last_time
+
+            # IGNORA gli step con stesso timestamp
+            if delta_t < 0:
+                continue
             last_time = row['time']
 
-            x_prev = x_stima.copy()
-            x_stima = motion_model(x_prev, last_u, delta_t)
-            fx = jacobian_fx(x_prev, last_u, delta_t)
-            fu = jacobian_fu(x_prev, last_u, delta_t)
+            #Test solo ruote
+            if actual_sensor is None:
+                # fai SOLO predizione
+                x_stima, P = prediction_phase(x_stima, P, last_u, delta_t)
+                pose_stimate.append([row["time"], x_stima[0], x_stima[1], x_stima[2]])
+                covariances.append(P.copy())
+                continue
 
-            Q = last_warthog_Q
-            P = fx @ P @ fx.T + fu @ Q @ fu.T
+            if actual_sensor.has_update_u_phase():
+                last_u = actual_sensor.get_u_parameter(row)
 
-            if row['topic'] == 'dlio':
-                #FASE DI PREDIZIONE
-                cov = np.array(row['msg'].pose.covariance).reshape((6, 6))
-                R_dlio = np.array([
-                    [cov[0, 0], cov[0, 1], cov[0, 5]],
-                    [cov[1, 0], cov[1, 1], cov[1, 5]],
-                    [cov[5, 0], cov[5, 1], cov[5, 5]],
-                ])
+            x_stima,P = prediction_phase(x_stima,P,last_u, delta_t)
 
-                z = np.array([
-                    row['msg'].pose.pose.position.x,
-                    row['msg'].pose.pose.position.y,
-                    quaternion_to_yaw(
-                        row['msg'].pose.pose.orientation.x,
-                        row['msg'].pose.pose.orientation.y,
-                        row['msg'].pose.pose.orientation.z,
-                        row['msg'].pose.pose.orientation.w
-                    )
-                ])
+            if actual_sensor.has_correction_phase():
 
-                innovazione = z - H_dlio @ x_stima
-                innovazione[2] = (innovazione[2] + np.pi) % (2 * np.pi) - np.pi
+                H = actual_sensor.get_H_matrix()
+                R = actual_sensor.get_R_matrix(row)
+                z = actual_sensor.get_z_measurements(row)
 
-                S = H_dlio @ P @ H_dlio.T + R_dlio
-                K = P @ H_dlio.T @ np.linalg.inv(S)
+                innovazione = z - H @ x_stima
+                # Normalize yaw per tenerlo sempre tra -pi e pi(solo se presente nel vettore -->Dlio)
+                if innovazione.shape[0] == 3:
+                    innovazione[2] = (innovazione[2] + np.pi) % (2 * np.pi) - np.pi
+
+                S = H @ P @ H.T + R
+                K = P @ H.T @ np.linalg.inv(S)
                 x_stima = x_stima + K @ innovazione
-                P = (np.eye(3) - K @ H_dlio) @ P
+                P = (np.eye(3) - K @ H) @ P
 
+                # Normalize theta
                 x_stima[2] = (x_stima[2] + np.pi) % (2 * np.pi) - np.pi
 
-
-            if row['topic'] == 'warthog':
-                #Aggiornamento Q e ingressi
-                last_u = np.array([
-                    row['msg'].twist.twist.linear.x,
-                    row['msg'].twist.twist.angular.z
-                ])
-
-                cov_twist = np.array(row['msg'].twist.covariance).reshape((6, 6))
-                Q_warthog = np.array([
-                    [cov_twist[0, 0], 0.],
-                    [0.,             cov_twist[5, 5]]
-                ])
-
-                if np.linalg.det(Q_warthog) < 1e-12:
-                    Q_warthog += np.eye(2) * 1e-3
-
-                last_warthog_Q = Q_warthog
-
-            if row['topic'] == 'gps':
-                #Correzione GPS
-                cov = np.array(row['msg'].pose.covariance).reshape((6, 6))
-                R_gps = np.array([
-                    [cov[0, 0], cov[0, 1]],
-                    [cov[1, 0], cov[1, 1]]
-                ])
-
-                if np.linalg.det(R_gps) < 1e-12:
-                    R_gps += np.eye(2) * 0.5
-
-                z = np.array([
-                    row['msg'].pose.pose.position.x,
-                    row['msg'].pose.pose.position.y
-                ])
-
-                z_pred = H_gps @ x_stima
-                innovazione = z - z_pred
-
-                S = H_gps @ P @ H_gps.T + R_gps
-                K = P @ H_gps.T @ np.linalg.inv(S)
-
-                x_stima = x_stima + K @ innovazione
-                P = (np.eye(3) - K @ H_gps) @ P
-
-                x_stima[2] = (x_stima[2] + np.pi) % (2 * np.pi) - np.pi
             pose_stimate.append([row["time"], x_stima[0], x_stima[1], x_stima[2]])
             covariances.append(P.copy())
 
