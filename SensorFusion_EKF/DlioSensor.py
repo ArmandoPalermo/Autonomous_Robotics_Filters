@@ -35,3 +35,12 @@ class DlioSensor:
             [cov[5, 0], cov[5, 1], cov[5, 5]],
         ])
         return R_dlio
+
+
+    def get_u_parameter(self,row):
+        u = np.array([
+            row['msg'].twist.twist.linear.x,
+            row['msg'].twist.twist.angular.z
+        ])
+
+        return u

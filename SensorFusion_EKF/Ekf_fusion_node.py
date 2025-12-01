@@ -105,24 +105,19 @@ def ekf_sensor_fusion(timeline,sensors):
 
             delta_t = row['time'] - last_time
 
-            # IGNORA gli step con stesso timestamp
-            if delta_t < 0:
-                continue
-            last_time = row['time']
-
-            #Test solo ruote
-            if actual_sensor is None:
-                # fai SOLO predizione
+            # Predizione solo quando dt >0
+            if delta_t > 0:
                 x_stima, P = prediction_phase(x_stima, P, last_u, delta_t)
                 pose_stimate.append([row["time"], x_stima[0], x_stima[1], x_stima[2]])
                 covariances.append(P.copy())
-                continue
 
+
+            last_time = row['time']
+            #Verifica se il sensore del messaggio attuale è usato per aggiornare le velocità
             if actual_sensor.has_update_u_phase():
                 last_u = actual_sensor.get_u_parameter(row)
 
-            x_stima,P = prediction_phase(x_stima,P,last_u, delta_t)
-
+            #Verifica se il sensore del messaggio attuale è usato per la fase di correzione
             if actual_sensor.has_correction_phase():
 
                 H = actual_sensor.get_H_matrix()
