@@ -14,7 +14,8 @@ def load_data(bag_path):
     data = {
         'gps': {},
         'dlio': {},
-        'warthog': {}
+        'warthog': {},
+        'ekf_utm': {}
     }
 
     # Variabili per ogni topic
@@ -32,7 +33,8 @@ def load_data(bag_path):
     topic_map = {
         '/odometry/gps': 'gps',
         '/robot/dlio/odom_node/odom': 'dlio',
-        '/warthog_velocity_controller/odom': 'warthog'
+        '/warthog_velocity_controller/odom': 'warthog',
+        '/isarlab/odometry/ekf_utm': 'ekf_utm'
     }
 
     timeline = []

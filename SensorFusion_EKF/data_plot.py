@@ -4,17 +4,15 @@ import matplotlib.pyplot as plt
 def plot_trajectory(data, ekf_data):
     plt.figure(figsize=(10, 8))
 
-    colors = ['blue', 'red', 'green']
-    labels = ['0. GPS', '1. DLIO', '2. Warthog Velocity']
+    colors = ['blue', 'red', 'green', 'purple']
+    labels = ['0. GPS', '1. DLIO', '2. Warthog Velocity', '3. EKF UTM']
 
-    # Plots originali
-    for key, color, label in zip(['gps', 'dlio', 'warthog'], colors, labels):
+    for key, color, label in zip(['gps', 'dlio', 'warthog', 'ekf_utm'], colors, labels):
         plt.plot(data[key]['x'], data[key]['y'],
                  color=color, label=label, linewidth=2, alpha=0.8)
 
-    # EKF fusion (traiettoria finale)
     plt.plot(ekf_data['x'], ekf_data['y'],
-             color='black', linewidth=3, label='3. EKF Fusion')
+             color='black', linewidth=3, label='4. EKF Fusion')
 
     plt.xlabel('X [m]', fontsize=12, fontweight='bold')
     plt.ylabel('Y [m]', fontsize=12, fontweight='bold')
@@ -28,9 +26,8 @@ def plot_cov_trace(data, posterior, ekf_time):
 
     plt.figure(figsize=(12, 6))
 
-    # --- Sensori ---
-    for key, color in zip(["gps", "dlio", "warthog"],
-                          ["blue", "red", "green"]):
+    for key, color in zip(["gps", "dlio", "warthog", "ekf_utm"],
+                          ["blue", "red", "green", "purple"]):
 
         if key not in data:
             continue
@@ -52,7 +49,6 @@ def plot_cov_trace(data, posterior, ekf_time):
             color=color
         )
 
-    # EKF plot management
     ekf_trace = np.array([np.trace(P) for P in posterior])
     ekf_trace_norm = ekf_trace / np.max(ekf_trace)
 
@@ -70,4 +66,5 @@ def plot_cov_trace(data, posterior, ekf_time):
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.legend()
+
 
