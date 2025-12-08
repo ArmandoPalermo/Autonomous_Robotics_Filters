@@ -24,12 +24,15 @@ class GpsSensor:
         return  H_gps
 
     def get_R_matrix(self,row):
+        scaleFactor = 1
         cov = np.array(row['msg'].pose.covariance).reshape((6, 6))
         R_gps = np.array([
             [cov[0, 0], cov[0, 1]],
             [cov[1, 0], cov[1, 1]]
         ])
-        return R_gps
+
+        #print(R_gps)
+        return R_gps * scaleFactor
 
 
 

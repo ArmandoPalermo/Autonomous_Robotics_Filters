@@ -7,7 +7,7 @@ from GpsSensor import  GpsSensor
 from WarthogWheelSensor import WarthogWheelSensor
 
 # Nome del file rosbag nella cartella Rosbag/
-BAG_FILENAME = "Rosbag_Warthog_PercorsoVerde_AR_2526-01-22_4_topics_map_drift_test.bag"
+BAG_FILENAME = "Rosbag_Warthog_PercorsoVerde_AR_2526-01-22_4_topics_map_drift.bag"
 
 
 if __name__ == "__main__":
