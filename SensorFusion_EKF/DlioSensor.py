@@ -27,15 +27,27 @@ class DlioSensor:
     def get_H_matrix(self):
         return np.eye(3)
 
-    def get_R_matrix(self,row):
-        cov = np.array(row['msg'].pose.covariance).reshape((6, 6))
-        R_dlio = np.array([
-            [cov[0, 0], cov[0, 1], cov[0, 5]],
-            [cov[1, 0], cov[1, 1], cov[1, 5]],
-            [cov[5, 0], cov[5, 1], cov[5, 5]],
-        ])
-        return R_dlio
+    def get_R_matrix(self, row):
+        cov = np.array(row["msg"].pose.covariance).reshape(6, 6)
 
+        # estrai i tre elementi che ti interessano
+        var_x = max(cov[0, 0], 1e-6)
+        var_y = max(cov[1, 1], 1e-6)
+        var_yaw = max(cov[5, 5], 1e-6)
+
+        # scaling separato
+        scale_xy = 1 # come il tuo attuale scaleFactor per x,y
+        scale_yaw = 1 # yaw meno scalato perché più attendibile
+
+
+        R_dlio = np.array([
+            [var_x * scale_xy, 0.0, 0.0],
+            [0.0, var_y * scale_xy, 0.0],
+            [0.0, 0.0, var_yaw * scale_yaw]
+        ])
+
+        #print(R_dlio)
+        return R_dlio
 
     def get_u_parameter(self,row):
         u = np.array([

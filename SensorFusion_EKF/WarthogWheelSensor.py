@@ -33,13 +33,14 @@ class WarthogWheelSensor:
         return np.array([0,0,1])
 
     def get_R_matrix(self,row):
+        scaleFactor = 1
         cov = np.array(row['msg'].pose.covariance).reshape((6, 6))
         R_wheel = np.array([
             [cov[0, 0], cov[0, 1], cov[0, 5]],
             [cov[1, 0], cov[1, 1], cov[1, 5]],
             [cov[5, 0], cov[5, 1], cov[5, 5]],
         ])
-        return R_wheel * 5
+        return R_wheel * scaleFactor
 
     def get_u_parameter(self,row):
         u = np.array([

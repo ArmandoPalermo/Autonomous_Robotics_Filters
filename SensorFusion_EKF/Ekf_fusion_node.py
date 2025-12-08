@@ -12,10 +12,11 @@ def get_Q_Matrix(u):
     # Parametri scelti per la varianza
     alpha1 = 0.1
     alpha2 = 0.1
-    alpha3 = 0.2
-    alpha4 = 0.2
+    alpha3 = 0.1
+    alpha4 = 0.1
 
-    var_v = alpha1 * (u[0] ** 2) + alpha2 * (u[1] ** 2)
+
+    var_v = alpha1 * (u[0] ** 2) + alpha2 * (np.abs(u[1]) ** 2)
     var_w = alpha3 * (u[0] ** 2) + alpha4 * (u[1] ** 2)
 
     Q = np.array([
@@ -81,7 +82,10 @@ def ekf_sensor_fusion(timeline, sensors):
 
     last_u = np.array([0.1, 0.1])
     last_prediction_topic = ""
-
+    last_correction_topic = ""
+    n_same_topic = 0
+    alpha  = 1
+    alpha_veloce = 1
     for row in timeline:
 
         actual_sensor = sensors.get(row["topic"])
@@ -106,7 +110,7 @@ def ekf_sensor_fusion(timeline, sensors):
             x_stima = np.array([x, y, theta])
 
             # Covarianza iniziale
-            P = np.diag([1, 1, (10 * np.pi / 180) ** 2])
+            P = np.diag([0.1, 0.1, (10 * np.pi / 180) ** 2])
             covariances.append(P.copy())
 
             # Salva la prima posa
@@ -115,18 +119,23 @@ def ekf_sensor_fusion(timeline, sensors):
             inizialized = True
             last_time = row["time"]
 
+            #Inizializzazione conteggio presenza topic(utile per scalare le R in base alla Freq)
+            n_same_topic += 1
+            if actual_sensor.has_correction_phase:
+                last_correction_topic = actual_sensor.topic
         else:
 
             delta_t = row["time"] - last_time
+
+
+            if actual_sensor.has_update_u_phase():
+                last_u = np.array(actual_sensor.get_u_parameter(row))
 
             # Predizione solo quando dt > 0
             if delta_t > 0:
                 x_stima, P = prediction_phase(x_stima, P, last_u, delta_t)
                 last_prediction_topic = actual_sensor.topic
                 last_time = row["time"]
-
-                if actual_sensor.has_update_u_phase():
-                    last_u = np.array(actual_sensor.get_u_parameter(row))
 
             # Timestamp uguale → niente predizione doppia
             elif actual_sensor.has_update_u_phase():
@@ -137,10 +146,28 @@ def ekf_sensor_fusion(timeline, sensors):
             # Fase di correzione
             if actual_sensor.has_correction_phase():
 
-                H = actual_sensor.get_H_matrix()
-                R = actual_sensor.get_R_matrix(row)
-                z = actual_sensor.get_z_measurements(row)
 
+                if actual_sensor.topic == last_correction_topic:
+                    n_same_topic +=1
+                else:
+                    print(n_same_topic)
+                    # calcolo alpha in base a quanto era il rate per distinguere tra topic veloce e lento
+                    #Se n_same_topic è minore di 1 allora vuol dire che il passaggio è stato lento --> veloce
+                    #Se invece è maggiore allora veloce-->lento
+                    if n_same_topic <= 1:
+                        alpha = 10 * alpha_veloce
+                    else:
+                        alpha = 1 / n_same_topic
+                        alpha = 0.1 * alpha
+                        alpha_veloce = n_same_topic
+
+                    n_same_topic = 1
+                    last_correction_topic = actual_sensor.topic
+
+                H = actual_sensor.get_H_matrix()
+                R = alpha * actual_sensor.get_R_matrix(row)
+                z = actual_sensor.get_z_measurements(row)
+                print('MSG:',actual_sensor.topic,' R:',R)
                 innovazione = z - H @ x_stima
 
                 # Normalizza yaw (solo se presente nel vettore)
@@ -149,14 +176,12 @@ def ekf_sensor_fusion(timeline, sensors):
 
                 S = H @ P @ H.T + R
                 K = P @ H.T @ np.linalg.inv(S)
-
                 x_stima = x_stima + K @ innovazione
-                P = (np.eye(3) - K @ H) @ P
 
+                P = (np.eye(3) - K @ H) @ P
                 # Normalizza theta
                 x_stima[2] = (x_stima[2] + np.pi) % (2 * np.pi) - np.pi
 
             pose_stimate.append([row["time"], x_stima[0], x_stima[1], x_stima[2]])
             covariances.append(P.copy())
-
     return pose_stimate, covariances
