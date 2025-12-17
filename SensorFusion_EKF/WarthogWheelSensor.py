@@ -1,6 +1,4 @@
-
 import numpy as np
-from sympy import false
 
 from Ekf_fusion_node import quaternion_to_yaw
 
@@ -8,13 +6,15 @@ class WarthogWheelSensor:
 
     topic = "warthog"
 
+    # Metodo che definisce se un sensore viene usato in fase di correzione ho meno
     def has_correction_phase(self):
         return False
 
+    # Metodo che definisce se un sensore viene usato per aggiornare il controllo u da dare al motion model
     def has_update_u_phase(self):
         return True
 
-
+    # Metodo get per ottenere le misurazioni dal sensore
     def get_z_measurements(self,row):
         z = np.array([
             row['msg'].pose.pose.position.x,
@@ -28,10 +28,12 @@ class WarthogWheelSensor:
         ])
         return z
 
+    # Metodo get per ottenere la matrice H usata per la fase di correzione
     def get_H_matrix(self):
         #Correggi theta?
         return np.array([0,0,1])
 
+    # Metodo get per ottenere la matrice R(rumore di misura)
     def get_R_matrix(self,row):
         scaleFactor = 1
         cov = np.array(row['msg'].pose.covariance).reshape((6, 6))
@@ -42,6 +44,7 @@ class WarthogWheelSensor:
         ])
         return R_wheel * scaleFactor
 
+    # Metodo per ottenere i parametri di velocità dal topic
     def get_u_parameter(self,row):
         u = np.array([
            - row['msg'].twist.twist.linear.x,
