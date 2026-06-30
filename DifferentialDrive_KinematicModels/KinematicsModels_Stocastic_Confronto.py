@@ -3,8 +3,6 @@ import random as rnd
 import matplotlib.pyplot as plt
 import math
 
-from matplotlib.lines import lineStyles
-
 
 def eulermodel(posa_prec ,v_k, w_k, gamma_1, period):
     xkp1 = posa_prec[0] + v_k * period * math.cos(posa_prec[2])

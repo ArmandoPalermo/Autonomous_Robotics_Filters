@@ -167,7 +167,6 @@ def ekf_sensor_fusion(timeline, sensors):
                 H = actual_sensor.get_H_matrix()
                 R = alpha * actual_sensor.get_R_matrix(row)
                 z = actual_sensor.get_z_measurements(row)
-                print('MSG:',actual_sensor.topic,' R:',R)
                 innovazione = z - H @ x_stima
 
                 # Normalizza yaw (solo se presente nel vettore)

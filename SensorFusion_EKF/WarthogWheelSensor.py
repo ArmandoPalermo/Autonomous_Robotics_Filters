@@ -1,6 +1,5 @@
 
 import numpy as np
-from sympy import false
 
 from Ekf_fusion_node import quaternion_to_yaw
 
