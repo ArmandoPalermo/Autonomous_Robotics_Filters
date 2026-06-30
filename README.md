@@ -9,13 +9,13 @@ with localization and sensor fusion techniques.
 
 ## 📚 Full Documentation for EKF fusion
 
-👉 **SensorFusion_EKF/Docummentation_EKF_Fusion** 
+👉 **SensorFusion_EKF/Docummentation_EKF_Fusion.pdf** 
 
 ---
 
 ## 📦 Repo Content
 
-### 🔹 1. Particle Filter
+### 🔹 1. Particle Filter and EKF - 2D
 Implementation of a particle filter for robot state estimation in environments with
 non‑Gaussian noise.  
 Includes:
@@ -31,7 +31,7 @@ Directory: `particle_and_EKF_2DFilter/`
 
 ### 🔹 3. EKF Sensor Fusion (Real ROSbag)
 Implementation of an **Extended Kalman Filter** for fusing data from a real ROSbag
-(e.g., DLIO + Odometry + GPS).  
+(DLIO + Odometry + GPS).  
 
 Directory: `SensorFusion_EKF/`
 
