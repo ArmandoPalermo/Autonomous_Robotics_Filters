@@ -95,7 +95,11 @@ if __name__ == "__main__":
 
     if USE_KALMAN_FILTER:
         #Inizializzazione della stima predetta
+<<<<<<< HEAD
         x_stima = np.array([5,5])
+=======
+        x_stima = np.array([0,0])
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
 
         #Inizializzazione posterior e prior al passo zero
         var_x,var_y  = 10,10

@@ -1,12 +1,17 @@
 import numpy as np
 
+<<<<<<< HEAD
 
+=======
+#Funzione utilizzata per trasformare il quaternione presente nei messaggi Odometry in una misura angolare theta
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
 def quaternion_to_yaw(qx, qy, qz, qw):
     siny_cosp = 2 * (qw * qz + qx * qy)
     cosy_cosp = 1 - 2 * (qy * qy + qz * qz)
     yaw_rad = np.arctan2(siny_cosp, cosy_cosp)
     return yaw_rad  # Converti in radianti
 
+<<<<<<< HEAD
 
 def get_Q_Matrix(u):
     # Parametri scelti per la varianza
@@ -15,6 +20,15 @@ def get_Q_Matrix(u):
     alpha3 = 0.1
     alpha4 = 0.1
 
+=======
+#Funzione che restituisce la matrice Q scelta parametricamente in base alle velocità attuali del robot
+def get_Q_Matrix(u):
+    # Parametri scelti per la varianza
+    alpha1 = 0.01
+    alpha2 = 0.01
+    alpha3 = 0.01
+    alpha4 = 0.01
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
 
     var_v = alpha1 * (u[0] ** 2) + alpha2 * (np.abs(u[1]) ** 2)
     var_w = alpha3 * (u[0] ** 2) + alpha4 * (u[1] ** 2)
@@ -25,7 +39,11 @@ def get_Q_Matrix(u):
     ])
     return Q
 
+<<<<<<< HEAD
 
+=======
+#Funzione usata per effettuare la fase di predizione
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
 def prediction_phase(x, P, last_u, delta_t):
     # FASE DI PREDIZIONE
     x_prev = x.copy()
@@ -40,7 +58,12 @@ def prediction_phase(x, P, last_u, delta_t):
     return x_stima, P
 
 
+<<<<<<< HEAD
 # u = [v, omega]
+=======
+# Motion model differential drive discretizzato con modello di eulero
+# u = [v, omega] --> ingresso con sole 2 componenti
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
 def motion_model(x_prev, u, dt):
     v, w = u
     th = x_prev[2]
@@ -52,7 +75,11 @@ def motion_model(x_prev, u, dt):
 
     return x_new
 
+<<<<<<< HEAD
 
+=======
+#Calcolo dello jacobiano del motion model rispetto allo stato [x,y,theta]
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
 def jacobian_fx(x, u, dt):
     v, _ = u
     theta = x[2]
@@ -63,7 +90,11 @@ def jacobian_fx(x, u, dt):
         [0., 0., 1.]
     ])
 
+<<<<<<< HEAD
 
+=======
+#Calcolo dello jacobiano del motion model rispetto all'ingresso u = [v, omega]
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
 def jacobian_fu(x, u, dt):
     theta = x[2]
 
@@ -73,6 +104,7 @@ def jacobian_fu(x, u, dt):
         [0.,                 dt]
     ])
 
+<<<<<<< HEAD
 
 def ekf_sensor_fusion(timeline, sensors):
 
@@ -95,6 +127,32 @@ def ekf_sensor_fusion(timeline, sensors):
             continue
 
         # Inizializzazione EKF al primo messaggio
+=======
+#Funzione che gestisce la sensor_fusion
+def ekf_sensor_fusion(timeline, sensors):
+
+    #INIZIALIZZAZIONE DEI PARAMETRI
+    pose_stimate = []
+    covariances = []
+    inizialized = False
+    last_u = np.array([0.1, 0.1]) # inizializzazione dell'ingresso u
+    last_prediction_topic = "" #ultimo topic usato per la predizione
+    last_correction_topic = "" #ultimo topic usato per la correzione
+    n_same_topic = 0 # contatore che tiene conto del numero di volte che si presenta lo stesso topic
+    alpha  = 1 # inizializzazione parametro moltiplicativo delle matrici R a seconda della frequenza
+    alpha_veloce = 1 # Variabile di supporto per alpha
+
+    #CICLO DI LETTURA DEI MESSAGGI ALLINEATI PER TIMESTAMP
+    for row in timeline:
+        #Inizializzazione sensore del messaggio attualmente analizzato
+        actual_sensor = sensors.get(row["topic"])
+
+        # Utile in fase di test (per togliere sensori dalla lista dei topic usati)
+        if actual_sensor is None:
+            continue
+
+        # Inizializzazione EKF al primo messaggio per evitare un passo di predizione con dt nullo
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
         if not inizialized:
 
             x = row['msg'].pose.pose.position.x
@@ -124,10 +182,17 @@ def ekf_sensor_fusion(timeline, sensors):
             if actual_sensor.has_correction_phase:
                 last_correction_topic = actual_sensor.topic
         else:
+<<<<<<< HEAD
 
             delta_t = row["time"] - last_time
 
 
+=======
+            #Aggiorno il dt
+            delta_t = row["time"] - last_time
+
+            #Aggiorno l'ingresso se il messaggio è di un sensore che prevede la fase di aggiornamento di u
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
             if actual_sensor.has_update_u_phase():
                 last_u = np.array(actual_sensor.get_u_parameter(row))
 
@@ -137,6 +202,7 @@ def ekf_sensor_fusion(timeline, sensors):
                 last_prediction_topic = actual_sensor.topic
                 last_time = row["time"]
 
+<<<<<<< HEAD
             # Timestamp uguale → niente predizione doppia
             elif actual_sensor.has_update_u_phase():
                 if actual_sensor.topic == last_prediction_topic:
@@ -151,11 +217,29 @@ def ekf_sensor_fusion(timeline, sensors):
                     n_same_topic +=1
                 else:
                     print(n_same_topic)
+=======
+            # Timestamp uguale → niente predizione doppia ma aggiorna u comunque
+            elif actual_sensor.has_update_u_phase():
+                last_u = actual_sensor.get_u_parameter(row)
+                continue
+
+            # FASE DI CORREZIONE
+            if actual_sensor.has_correction_phase():
+
+                #GESTIONE DEI TOPIC CON FREQUENZA MAGGIORE
+                if actual_sensor.topic == last_correction_topic:
+                    n_same_topic +=1
+                else:
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
                     # calcolo alpha in base a quanto era il rate per distinguere tra topic veloce e lento
                     #Se n_same_topic è minore di 1 allora vuol dire che il passaggio è stato lento --> veloce
                     #Se invece è maggiore allora veloce-->lento
                     if n_same_topic <= 1:
+<<<<<<< HEAD
                         alpha = 10 * alpha_veloce
+=======
+                        alpha = alpha_veloce
+>>>>>>> fa9b12db0f5fd97ca6665628c95ce1e2b1134118
                     else:
                         alpha = 1 / n_same_topic
                         alpha = 0.1 * alpha
