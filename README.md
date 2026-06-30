@@ -9,7 +9,7 @@ with localization and sensor fusion techniques.
 
 ## 📚 Full Documentation for EKF fusion
 
-👉 **SensorFusion_EKF/Docummentation_EKF_Fusion.pdf** 
+👉 **SensorFusion_EKF/Documentation_EKF_Fusion.pdf** 
 
 ---
 
